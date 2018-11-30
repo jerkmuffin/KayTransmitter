@@ -6,6 +6,7 @@ import boto3
 import logging
 import requests
 import playsound
+import gpio_ctrl
 import secret_codes
 
 
@@ -17,6 +18,10 @@ fh.setLevel(logging.INFO)
 
 ch = logging.StreamHandler()
 ch.setLevel(logging.DEBUG)
+
+fmat = logging.Formatter('%(asctime)s - %(message)s')
+
+fh.setFormatter(fmat)
 
 logger.addHandler(ch)
 logger.addHandler(fh)
@@ -52,9 +57,10 @@ def send_timestamp(uuid):
 
 def transmit_mp3_into_space(uuid):
     f = os.path.basename(uuid)
-    logging.debug("playing mp3: {}".format(f))
+    logger.info("playing mp3: {}".format(f))
+    gpio_ctrl.ptt_on()
     playsound.playsound(f)
-
+    gpio_ctrl.ptt_off()
 
 while True:
     try:
@@ -70,8 +76,12 @@ while True:
             #print("I have recieved data!\nfile: {}\nID: {}".format(json_ob['file'], json_ob['recordingID']))
             download_and_write_to_disk(json_ob['file'])
             status = send_timestamp(json_ob['recordingID'])
-            transmit_mp3_into_space(json_ob['file'])
-
+            try:
+                transmit_mp3_into_space(json_ob['file'])
+                logger.info("done playing file")
+                logger.info("files left in queue: {}".format(len(queue.receive_messages())))
+            except Exception as e:
+                print(e)
     except KeyboardInterrupt:
         print('\npretty exit')
         sys.exit(1)
